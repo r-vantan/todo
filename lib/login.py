@@ -1,4 +1,4 @@
-from ..utils.db import auth_user
+from utils.db import auth_user
 
 async def login(email, password):
     """
@@ -15,4 +15,4 @@ async def login(email, password):
     user = await auth_user(email, password)
     if user:
         return True, "ログイン成功", user
-    return False, "メールとパスワードが一致しません。", None
+    return False, "メールアドレスとパスワードが一致しません。", None

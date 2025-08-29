@@ -1,4 +1,4 @@
-from ..utils.db import create_user
+from utils.db import create_user
 
 async def create_user(name, email, password):
     """
