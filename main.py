@@ -1,3 +1,7 @@
+import os
+# macOSのIMKCエラーメッセージを抑制
+os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
+
 import tkinter as tk
 from pages.login import LoginPage
 from pages.todo import TodoPage
@@ -37,6 +41,10 @@ class App(tk.Tk):
         """指定したページを最前面に表示する"""
         frame = self.frames[page_name]
         frame.tkraise()
+        # フォーカスをリセットして、前のページのフォーカス状態を無効化
+        frame.focus_set()
+        # 少し待ってから再度フォーカスをリセット（確実にするため）
+        self.after(1, lambda: frame.focus_set())
 
 
 if __name__ == "__main__":

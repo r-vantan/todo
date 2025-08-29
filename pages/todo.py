@@ -1,6 +1,8 @@
 import tkinter as tk
 from lib.tasks import TaskManager
 from lib.session import get_current_user_id
+from lib.session import logout as db_logout
+import asyncio
 
 task_manager: TaskManager = TaskManager()
 
@@ -10,7 +12,7 @@ class TodoPage(tk.Frame):
         self.controller = controller
 
         # UI
-        logout_button = tk.Button(self, text="ログアウト")
+        logout_button = tk.Button(self, text="ログアウト", command=self.logout)
         logout_button.pack(pady=10)
 
         # タスク一覧表示エリア
@@ -42,3 +44,7 @@ class TodoPage(tk.Frame):
         user_id = get_current_user_id()
         shared_tasks = task_manager.get_shared_tasks(user_id)
         return shared_tasks
+    
+    def logout(self):
+        db_logout()
+        self.controller.show_frame("login")

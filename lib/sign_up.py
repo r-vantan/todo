@@ -1,4 +1,4 @@
-from utils.db import create_user
+from utils.db import create_user as db_create_user
 
 async def create_user(name, email, password):
     """
@@ -13,7 +13,7 @@ async def create_user(name, email, password):
             - str: A message indicating the result of the user creation attempt.
     """
     try:
-        await create_user(name, email, password)
+        await db_create_user(name, email, password)
         return True, "ユーザー登録が成功しました。"
     except Exception as e:
         return False, f"ユーザー登録に失敗しました: {str(e)}"
