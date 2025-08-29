@@ -228,3 +228,203 @@ async def get_shared_tasks_by_user(user_id):
             (user_id,)
         )
         return await cursor.fetchall()
+
+async def delete_task(task_id):
+    """
+    タスクを削除する
+    
+    Args:
+        task_id (int): 削除するタスクのID
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        # タスク共有も削除
+        await conn.execute("DELETE FROM task_shares WHERE task_id = ?", (task_id,))
+        # タスク削除
+        await conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        await conn.commit()
+
+async def update_task(task_id, name=None, description=None, tag=None, deadline=None, priority=None):
+    """
+    タスク情報を更新する
+    
+    Args:
+        task_id (int): 更新するタスクのID
+        name (str, optional): 新しいタスク名
+        description (str, optional): 新しい詳細説明
+        tag (int, optional): 新しいタグID
+        deadline (datetime, optional): 新しい締め切り日時
+        priority (int, optional): 新しい優先度
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        # 更新するフィールドを動的に構築
+        updates = []
+        params = []
+        
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if tag is not None:
+            updates.append("tag = ?")
+            params.append(tag)
+        if deadline is not None:
+            updates.append("deadline = ?")
+            params.append(deadline)
+        if priority is not None:
+            updates.append("priority = ?")
+            params.append(priority)
+            
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(task_id)
+            query = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
+            await conn.execute(query, params)
+            await conn.commit()
+
+async def search_tasks(user_id, keyword=None, tag_id=None, is_done=None, priority=None):
+    """
+    タスクを検索する
+    
+    Args:
+        user_id (int): 検索するユーザーのID
+        keyword (str, optional): タスク名や詳細に含まれるキーワード
+        tag_id (int, optional): 特定のタグID
+        is_done (bool, optional): 完了状態（True: 完了済み, False: 未完了）
+        priority (int, optional): 特定の優先度
+        
+    Returns:
+        list: 検索条件に一致するタスク情報のタプルのリスト
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        query = "SELECT * FROM tasks WHERE user = ?"
+        params = [user_id]
+        
+        if keyword:
+            query += " AND (name LIKE ? OR description LIKE ?)"
+            params.extend([f"%{keyword}%", f"%{keyword}%"])
+        if tag_id is not None:
+            query += " AND tag = ?"
+            params.append(tag_id)
+        if is_done is not None:
+            query += " AND is_done = ?"
+            params.append(1 if is_done else 0)
+        if priority is not None:
+            query += " AND priority = ?"
+            params.append(priority)
+            
+        cursor = await conn.execute(query, params)
+        return await cursor.fetchall()
+
+async def get_tasks_sorted(user_id, sort_by="created_at", order="ASC"):
+    """
+    ソート済みのタスク一覧を取得する
+    
+    Args:
+        user_id (int): タスクを取得するユーザーのID
+        sort_by (str): ソートするカラム名（created_at, deadline, priority, name）
+        order (str): ソート順（ASC: 昇順, DESC: 降順）
+        
+    Returns:
+        list: ソート済みタスク情報のタプルのリスト
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        # SQLインジェクション対策でカラム名を検証
+        allowed_columns = ["created_at", "deadline", "priority", "name", "is_done"]
+        if sort_by not in allowed_columns:
+            sort_by = "created_at"
+        if order.upper() not in ["ASC", "DESC"]:
+            order = "ASC"
+            
+        query = f"SELECT * FROM tasks WHERE user = ? ORDER BY {sort_by} {order}"
+        cursor = await conn.execute(query, (user_id,))
+        return await cursor.fetchall()
+
+async def mark_task_undone(task_id):
+    """
+    タスクを未完了状態にする
+    
+    Args:
+        task_id (int): 未完了にするタスクのID
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "UPDATE tasks SET is_done = 0, completed_at = NULL WHERE id = ?",
+            (task_id,)
+        )
+        await conn.commit()
+
+async def get_tasks_by_deadline(user_id, start_date=None, end_date=None):
+    """
+    締め切り日範囲でタスクを取得する（リマインダー機能用）
+    
+    Args:
+        user_id (int): タスクを取得するユーザーのID
+        start_date (datetime, optional): 開始日時
+        end_date (datetime, optional): 終了日時
+        
+    Returns:
+        list: 指定期間内の締め切りがあるタスク情報のタプルのリスト
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        query = "SELECT * FROM tasks WHERE user = ? AND deadline IS NOT NULL"
+        params = [user_id]
+        
+        if start_date:
+            query += " AND deadline >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND deadline <= ?"
+            params.append(end_date)
+            
+        query += " ORDER BY deadline ASC"
+        cursor = await conn.execute(query, params)
+        return await cursor.fetchall()
+
+async def get_task_by_id(task_id):
+    """
+    タスクIDで特定のタスク情報を取得する
+    
+    Args:
+        task_id (int): 取得するタスクのID
+        
+    Returns:
+        tuple or None: タスク情報のタプル、見つからない場合はNone
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        return await cursor.fetchone()
+
+async def unshare_task(task_id, user_id=None):
+    """
+    タスクの共有を解除する
+    
+    Args:
+        task_id (int): 共有解除するタスクのID
+        user_id (int, optional): 特定ユーザーのみ共有解除。Noneの場合は全ユーザーの共有を解除
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        if user_id:
+            await conn.execute(
+                "DELETE FROM task_shares WHERE task_id = ? AND user_id = ?",
+                (task_id, user_id)
+            )
+        else:
+            await conn.execute(
+                "DELETE FROM task_shares WHERE task_id = ?",
+                (task_id,)
+            )
+        await conn.commit()
