@@ -4,6 +4,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_PATH
+import re
 
 async def encryption(password):
     """
@@ -19,6 +20,25 @@ async def encryption(password):
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed
 
+async def validate_email(email):
+    """
+    メールアドレスの形式を検証する
+    
+    Args:
+        email (str): 検証するメールアドレス
+        
+    Returns:
+        bool: 有効なメールアドレス形式の場合True、無効な場合False
+    """
+        
+    # 基本的なメールアドレスの正規表現パターン
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    if not email or not isinstance(email, str):
+        return False
+    
+    return re.match(pattern, email) is not None
+
 async def create_user(name, email, password):
     """
     新しいユーザーを作成する
@@ -32,6 +52,9 @@ async def create_user(name, email, password):
         None
     """
     hashed_password = await encryption(password)
+    # validate email format
+    if not validate_email(email):
+        raise ValueError("Invalid email format")
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute(
             "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
