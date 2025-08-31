@@ -13,7 +13,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TODOアプリ")
-        self.geometry("400x300")
+        self.geometry("800x600")
+        self.minsize(600, 400)  # 最小サイズを設定
 
         # ページを格納するコンテナフレーム
         self.container = tk.Frame(self)

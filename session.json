@@ -1,6 +1,6 @@
 {
-  "user_id": null,
-  "user_name": null,
-  "user_email": null,
-  "is_logged_in": false
+  "user_id": 1,
+  "user_name": "test",
+  "user_email": "test@example.com",
+  "is_logged_in": true
 }
