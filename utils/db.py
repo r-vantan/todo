@@ -20,7 +20,7 @@ async def encryption(password):
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed
 
-async def validate_email(email):
+def validate_email(email):
     """
     メールアドレスの形式を検証する
     
