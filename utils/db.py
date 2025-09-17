@@ -269,7 +269,7 @@ async def delete_task(task_id):
         await conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         await conn.commit()
 
-async def update_task(task_id, name=None, description=None, tag=None, deadline=None, priority=None):
+async def update_task(task_id, name=None, description=None, tag=None, deadline=None, priority=None, is_done=None):
     """
     タスク情報を更新する
     
@@ -280,7 +280,7 @@ async def update_task(task_id, name=None, description=None, tag=None, deadline=N
         tag (int, optional): 新しいタグID
         deadline (datetime, optional): 新しい締め切り日時
         priority (int, optional): 新しい優先度
-        
+        is_done (bool, optional): 完了状態（True: 完了済み, False: 未完了）
     Returns:
         None
     """
@@ -304,7 +304,13 @@ async def update_task(task_id, name=None, description=None, tag=None, deadline=N
         if priority is not None:
             updates.append("priority = ?")
             params.append(priority)
-            
+        if is_done is not None:
+            updates.append("is_done = ?")
+            params.append(1 if is_done else 0)
+            if is_done:
+                updates.append("completed_at = CURRENT_TIMESTAMP")
+            else:
+                updates.append("completed_at = NULL")
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
             params.append(task_id)
@@ -451,3 +457,53 @@ async def unshare_task(task_id, user_id=None):
                 (task_id,)
             )
         await conn.commit()
+
+async def create_tag(user_id, name, color=None):
+    """
+    新しいタグを作成する
+    
+    Args:
+        user_id (int): タグを作成するユーザーのID
+        name (str): タグ名
+        color (str, optional): タグの色。デフォルトはNone
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "INSERT INTO tags (user, name, color) VALUES (?, ?, ?)",
+            (user_id, name, color)
+        )
+        await conn.commit()
+
+async def delete_tag(tag_id):
+    """
+    タグを削除する
+    
+    Args:
+        tag_id (int): 削除するタグのID
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        # タグを使用しているタスクのタグをNULLに設定
+        await conn.execute("UPDATE tasks SET tag = NULL WHERE tag = ?", (tag_id,))
+        # タグ削除
+        await conn.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+        await conn.commit()
+
+async def get_tag_by_id(tag_id):
+    """
+    タグIDで特定のタグ情報を取得する
+    
+    Args:
+        tag_id (int): 取得するタグのID
+        
+    Returns:
+        tuple or None: タグ情報のタプル、見つからない場合はNone
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT * FROM tags WHERE id = ?", (tag_id,))
+        return await cursor.fetchone()
