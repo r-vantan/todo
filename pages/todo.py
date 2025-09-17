@@ -304,6 +304,8 @@ class TodoPage(tk.CTkFrame):
         name_label.pack(pady=(20, 0))
         name_entry = tk.CTkEntry(popup)
         name_entry.pack(pady=5)
+        error_label = tk.CTkLabel(popup, text="", fg_color="transparent")
+        error_label.pack()
         def save():
             name = name_entry.get()
             user_id = get_current_user_id()
@@ -317,7 +319,7 @@ class TodoPage(tk.CTkFrame):
                     tag_var.set(name)
                 popup.destroy()
             except Exception as e:
-                popup.title(f"エラー: {e}")
+                error_label.configure(text=f"エラー: {e}", text_color="red")
         save_btn = tk.CTkButton(popup, text="保存", command=save)
         save_btn.pack(pady=10)
         cancel_btn = tk.CTkButton(popup, text="キャンセル", command=popup.destroy)
