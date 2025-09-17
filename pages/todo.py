@@ -22,6 +22,7 @@ class TodoPage(tk.CTkFrame):
 
         # タグフィルタ
         self.tag_filter_var = tk.StringVar(value="すべて")
+        self.tag_id_dict = {}  # タグ名→IDの辞書
         self.tag_list = ["すべて"]  # 初期値、後で動的に更新可
         self.tag_filter_menu = tk.CTkOptionMenu(self, variable=self.tag_filter_var, values=self.tag_list, command=lambda v: self.refresh_tasks())
         self.tag_filter_menu.pack(pady=5)
@@ -78,15 +79,15 @@ class TodoPage(tk.CTkFrame):
         tasks = self.get_tasks()
         # タグ一覧を更新
         tags = asyncio.run(tag_manager.get_by_user(get_current_user_id()))
-        print("タグ一覧:", tags)
         tag_filter_values = ["すべて"] + [str(t[2]) for t in tags]  # タグ名のリスト
+        self.tag_id_dict = {str(t[2]): t[0] for t in tags}  # タグ名→IDの辞書
         self.tag_filter_menu.configure(values=tag_filter_values)
-        print("タグフィルタ値:", tag_filter_values)
 
         # タグフィルタ適用
         selected_tag = self.tag_filter_var.get()
         if selected_tag != "すべて":
-            tasks = [t for t in tasks if t[3] == selected_tag]
+            selected_tag_id = self.tag_id_dict.get(selected_tag)
+            tasks = [t for t in tasks if t[6] == selected_tag_id]
 
         for task in tasks:
             # DB設計に合わせてインデックス修正
