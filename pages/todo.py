@@ -9,6 +9,8 @@ from PIL import Image
 task_manager: TaskManager = TaskManager()
 tag_manager: TagManager = TagManager()
 
+priority = ["無", "低", "中", "高", "最高"]
+
 class TodoPage(tk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -92,8 +94,12 @@ class TodoPage(tk.CTkFrame):
             name = task[4]
             is_done = bool(task[3])  # 0/1→False/True
             tag_id = task[6]
-            # タグ名取得（本来はDBからid→name変換。ここではid表示）
-            tag_name = str(tag_id) if tag_id else ""
+            # タグ名取得（tag_idがNoneならDBアクセスしない）
+            if tag_id:
+                tag_info = asyncio.run(tag_manager.get_by_id(tag_id))
+                tag_name = tag_info[2] if tag_info else ""
+            else:
+                tag_name = ""
             row_frame = tk.CTkFrame(self.task_list_frame)
             row_frame.pack(fill="x", pady=2)
             # 完了チェックボックス
@@ -106,7 +112,7 @@ class TodoPage(tk.CTkFrame):
             label.pack(side="left", padx=5)
             label.bind("<Double-Button-1>", lambda e, tid=task_id: self.show_detail_popup(tid))
             # タグ
-            tag_label = tk.CTkLabel(row_frame, text=f"[{tag_name}]" if tag_name else "", width=60)
+            tag_label = tk.CTkLabel(row_frame, text=tag_name if tag_name else "", width=60)
             tag_label.pack(side="left", padx=5)
             trash_img = tk.CTkImage(
                 light_image=Image.open("static/trash.png"), size=(20, 20)
@@ -191,9 +197,20 @@ class TodoPage(tk.CTkFrame):
         tag_label.pack(pady=(15, 0))
         tag_frame = tk.CTkFrame(popup)
         tag_frame.pack(pady=5)
-        tag_options = self.get_tag_list()  # 例: [(id, name), ...]
+        tag_options = self.get_tag_list()  # 例: [(id, user_id, name), ...]
         tag_names = [str(t[2]) for t in tag_options]
-        tag_var = tk.StringVar(value=tag_names[0] if tag_names else "なし")
+        if "なし" not in tag_names:
+            tag_names = ["なし"] + tag_names
+        # 現在のタグIDを取得
+        task = asyncio.run(task_manager.get_by_id(task_id))
+        current_tag_id = task[6] if len(task) > 6 else None
+        if current_tag_id:
+            tag_info = asyncio.run(tag_manager.get_by_id(current_tag_id))
+            current_tag_name = str(tag_info[2]) if tag_info else "なし"
+        else:
+            current_tag_name = "なし"
+        # 初期値を現在のタグ名に
+        tag_var = tk.StringVar(value=current_tag_name if current_tag_name in tag_names else tag_names[0])
         tag_menu = tk.CTkOptionMenu(tag_frame, variable=tag_var, values=tag_names)
         tag_menu.pack(side="left")
         add_tag_btn = tk.CTkButton(tag_frame, text="＋", width=30, command=lambda: self.open_add_tag_popup(tag_menu, tag_var))
@@ -203,7 +220,24 @@ class TodoPage(tk.CTkFrame):
             from tkcalendar import DateEntry
             deadline_label = tk.CTkLabel(popup, text="締切:")
             deadline_label.pack(pady=(15, 0))
-            deadline_entry = DateEntry(popup, date_pattern='yyyy-mm-dd')
+            # ダークテーマ用色設定
+            deadline_entry = DateEntry(
+                popup,
+                date_pattern='yyyy年mm月dd日',
+                locale='ja_JP',
+                firstweekday='sunday',
+                background="#222222",
+                foreground="#ffffff",
+                bordercolor="#444444",
+                headersbackground="#333333",
+                headersforeground="#ffffff",
+                selectbackground="#00bfff",
+                selectforeground="#ffffff",
+                normalforeground="#ffffff",
+                weekendforeground="#ffffff",
+                othermonthforeground="#ffffff",
+                disabledforeground="#ffffff"
+            )
             deadline_entry.pack(pady=5)
         except ImportError:
             deadline_label = tk.CTkLabel(popup, text="締切 (YYYY-MM-DD):")
@@ -214,8 +248,9 @@ class TodoPage(tk.CTkFrame):
         # 優先度
         priority_label = tk.CTkLabel(popup, text="優先度:")
         priority_label.pack(pady=(15, 0))
-        priority_var = tk.StringVar(value="0")
-        priority_menu = tk.CTkOptionMenu(popup, variable=priority_var, values=["0", "1", "2", "3", "4", "5"])
+        task = asyncio.run(task_manager.get_by_id(task_id))
+        priority_var = tk.StringVar(value=priority[task[8]])
+        priority_menu = tk.CTkOptionMenu(popup, variable=priority_var, values=priority)
         priority_menu.pack(pady=5)
 
         # 完了状態
@@ -229,17 +264,24 @@ class TodoPage(tk.CTkFrame):
         def save():
             new_name = name_entry.get()
             new_desc = desc_entry.get()
-            # 選択タグ（本来はタグIDを保存する。ここではnameを仮保存）
-            new_tag = tag_var.get()
+            selected_tag_name = tag_var.get()
+            # タグID取得（"なし"ならNone、そうでなければIDを取得）
+            if selected_tag_name == "なし":
+                new_tag_id = None
+            else:
+                # tag_options: [(id, user_id, name)]
+                tag_options = self.get_tag_list()
+                tag_dict = {str(t[2]): t[0] for t in tag_options}
+                new_tag_id = tag_dict.get(selected_tag_name, None)
             new_deadline = deadline_entry.get()
-            new_priority = int(priority_var.get())
+            new_priority = priority.index(priority_var.get())
             new_is_done = is_done_var.get()
             try:
                 asyncio.run(task_manager.update(
                     task_id,
                     name=new_name,
                     description=new_desc,
-                    tag=new_tag,
+                    tag=new_tag_id,
                     deadline=new_deadline,
                     priority=new_priority,
                     is_done=new_is_done
