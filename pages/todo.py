@@ -77,11 +77,11 @@ class TodoPage(tk.CTkFrame):
             widget.destroy()
         tasks = self.get_tasks()
         # タグ一覧を更新
-        tags = set()
-        for t in tasks:
-            if t[3]: tags.add(t[3])
-        self.tag_list = ["すべて"] + [str(tag) for tag in sorted(list(tags))]
-        self.tag_filter_menu.configure(values=[str(x) for x in self.tag_list])
+        tags = asyncio.run(tag_manager.get_by_user(get_current_user_id()))
+        print("タグ一覧:", tags)
+        tag_filter_values = ["すべて"] + [str(t[2]) for t in tags]  # タグ名のリスト
+        self.tag_filter_menu.configure(values=tag_filter_values)
+        print("タグフィルタ値:", tag_filter_values)
 
         # タグフィルタ適用
         selected_tag = self.tag_filter_var.get()
