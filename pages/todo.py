@@ -269,7 +269,6 @@ class TodoPage(tk.CTkFrame):
             if selected_tag_name == "なし":
                 new_tag_id = None
             else:
-                # tag_options: [(id, user_id, name)]
                 tag_options = self.get_tag_list()
                 tag_dict = {str(t[2]): t[0] for t in tag_options}
                 new_tag_id = tag_dict.get(selected_tag_name, None)
