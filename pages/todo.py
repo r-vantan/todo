@@ -4,6 +4,7 @@ from lib.tags import TagManager
 from lib.session import get_current_user_id
 from lib.session import logout as db_logout
 import asyncio
+from aiosqlite import IntegrityError
 from PIL import Image
 
 task_manager: TaskManager = TaskManager()
@@ -60,11 +61,11 @@ class TodoPage(tk.CTkFrame):
                 asyncio.run(task_manager.create(user_id, name=name, description=None, tag=None, deadline=None, priority=0))
                 self.new_task_entry.delete(0, tk.END)
                 self.refresh_tasks()
-                self.status_label.configure(text="タスクを追加しました", fg_color="green")
+                self.status_label.configure(text="タスクを追加しました", text_color="green")
             except Exception as e:
-                self.status_label.configure(text=f"エラー: {e}", fg_color="red")
+                self.status_label.configure(text=f"エラー: {e}", text_color="red")
         else:
-            self.status_label.configure(text="タスク名を入力してください", fg_color="red")
+            self.status_label.configure(text="タスク名を入力してください", text_color="red")
 
     def get_tasks(self):
         user_id = get_current_user_id()
@@ -304,7 +305,7 @@ class TodoPage(tk.CTkFrame):
         name_label.pack(pady=(20, 0))
         name_entry = tk.CTkEntry(popup)
         name_entry.pack(pady=5)
-        error_label = tk.CTkLabel(popup, text="", fg_color="transparent")
+        error_label = tk.CTkLabel(popup, text="", text_color="red")
         error_label.pack()
         def save():
             name = name_entry.get()
@@ -318,6 +319,8 @@ class TodoPage(tk.CTkFrame):
                 if name in tag_names:
                     tag_var.set(name)
                 popup.destroy()
+            except IntegrityError:
+                error_label.configure(text="タグ名が重複しています", text_color="red")
             except Exception as e:
                 error_label.configure(text=f"エラー: {e}", text_color="red")
         save_btn = tk.CTkButton(popup, text="保存", command=save)
