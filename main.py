@@ -2,21 +2,23 @@ import os
 # macOSのIMKCエラーメッセージを抑制
 os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
 
-import tkinter as tk
+import customtkinter as tk
 from pages.login import LoginPage
 from pages.todo import TodoPage
 from pages.sign_up import SignUpPage
 from lib.session import is_logged_in
 
 
-class App(tk.Tk):
+class App(tk.CTk):
     def __init__(self):
         super().__init__()
         self.title("TODOアプリ")
-        self.geometry("400x300")
+        self.geometry("800x600")
+        self.minsize(600, 400)  # 最小サイズを設定
+        self.maxsize(1600, 1200)  # 最大サイズを設定
 
         # ページを格納するコンテナフレーム
-        self.container = tk.Frame(self)
+        self.container = tk.CTkFrame(self)
         self.container.pack(fill="both", expand=True)
 
         self.frames = {}
@@ -48,5 +50,7 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+    tk.set_appearance_mode("Dark")
+    tk.set_default_color_theme("blue")
     app = App()
     app.mainloop()
