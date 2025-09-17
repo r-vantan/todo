@@ -21,7 +21,8 @@ async def init_db():
             user INTEGER NOT NULL,
             name TEXT NOT NULL,
             color TEXT,
-            FOREIGN KEY(user) REFERENCES users(id)
+            FOREIGN KEY(user) REFERENCES users(id),
+            UNIQUE(user, name)
         );
         """)
         await db.execute("""

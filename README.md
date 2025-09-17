@@ -56,11 +56,11 @@
 | completed_at  | DATETIME   |                     | 完了日時               |
 
 #### tags
-| カラム名    | 型         | 制約                | 説明           |
-|-------------|------------|---------------------|----------------|
-| id          | INTEGER    | PRIMARY KEY         | タグID         |
-| user        | INTEGER    | FOREIGN KEY         | users(id)      |
-| name        | TEXT       | NOT NULL            | タグ名         |
-| color       | TEXT       |                     | タグ色         |
+| カラム名 | 型      | 制約                           | 説明      |
+|----------|---------|--------------------------------|-----------|
+| id       | INTEGER | PRIMARY KEY                    | タグID    |
+| user     | INTEGER | FOREIGN KEY (users.id)         | 所有ユーザーID |
+| name     | TEXT    | NOT NULL, UNIQUE(user, name)   | タグ名    |
+| color    | TEXT    |                                | タグ色    |
 
 ---
