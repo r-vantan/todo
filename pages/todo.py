@@ -78,6 +78,18 @@ class TodoPage(tk.CTkFrame):
         self.search_entry.pack(pady=5)
         self.search_entry.bind("<KeyRelease>", lambda e: self.refresh_tasks())
 
+        # タスク並び替え
+        self.sort_var = tk.StringVar(value="作成日")
+        sort_options = ["作成日", "期限日", "優先度", "名前"]
+        sort_menu = tk.CTkOptionMenu(self, variable=self.sort_var, values=sort_options, command=lambda v: self.refresh_tasks())
+        sort_menu.pack(pady=5)
+
+        # 昇順・降順切替
+        self.order_var = tk.StringVar(value="昇順")
+        order_options = ["昇順", "降順"]
+        order_menu = tk.CTkOptionMenu(self, variable=self.order_var, values=order_options, command=lambda v: self.refresh_tasks())
+        order_menu.pack(pady=5)
+
         # タグフィルタ
         self.tag_filter_var = tk.StringVar(value="すべて")
         self.tag_id_dict = {}  # タグ名→IDの辞書
@@ -142,16 +154,28 @@ class TodoPage(tk.CTkFrame):
         self.tag_id_dict = {str(t[2]): t[0] for t in tags}  # タグ名→IDの辞書
         self.tag_filter_menu.configure(values=tag_filter_values)
 
+        # 検索フィルタ適用
+        search_text = self.search_entry.get_real_value()
+        if search_text:
+            tasks = asyncio.run(task_manager.search(get_current_user_id(), keyword=search_text))
+
         # タグフィルタ適用
         selected_tag = self.tag_filter_var.get()
         if selected_tag != "すべて":
             selected_tag_id = self.tag_id_dict.get(selected_tag)
             tasks = [t for t in tasks if t[6] == selected_tag_id]
-        
-        # 検索フィルタ適用
-        search_text = self.search_entry.get_real_value()
-        if search_text:
-            tasks = asyncio.run(task_manager.search(get_current_user_id(), keyword=search_text))
+
+        # 並び替え適用
+        sort_key = self.sort_var.get()
+        reverse = self.order_var.get() == "降順"
+        if sort_key == "作成日":
+            tasks.sort(key=lambda x: x[9], reverse=reverse)  # 作成日でソート
+        elif sort_key == "期限日":
+            tasks.sort(key=lambda x: (x[7] is None, x[7]), reverse=reverse)  # 締切でソート、Noneは最後
+        elif sort_key == "優先度":
+            tasks.sort(key=lambda x: x[8], reverse=reverse)  # 優先度でソート
+        elif sort_key == "名前":
+            tasks.sort(key=lambda x: x[4].lower(), reverse=reverse)  # 名前でソート（大文字小文字区別なし）
 
         for task in tasks:
             # DB設計に合わせてインデックス修正
@@ -190,13 +214,6 @@ class TodoPage(tk.CTkFrame):
             edit_btn = tk.CTkButton(row_frame, image=edit_img,text="", width=30, command=lambda tid=task_id, nm=name: self.open_edit_popup(tid, nm))
             edit_btn.pack(side="left", padx=5)
 
-    def toggle_done(self, task_id, is_done):
-        try:
-            asyncio.run(task_manager.update(task_id, is_done=is_done))
-            self.refresh_tasks()
-        except Exception as e:
-            self.status_label.configure(text=f"完了状態更新エラー: {e}", fg_color="red")
-
         # 共有タスクもFrameで表示
         for widget in self.shared_task_list_frame.winfo_children():
             widget.destroy()
@@ -218,6 +235,14 @@ class TodoPage(tk.CTkFrame):
             del_btn.pack(side="left", padx=5)
             edit_btn = tk.CTkButton(row_frame, image=edit_img, text="", width=30, command=lambda tid=task_id, nm=name: self.open_edit_popup(tid, nm))
             edit_btn.pack(side="left", padx=5)
+
+    def toggle_done(self, task_id, is_done):
+        try:
+            asyncio.run(task_manager.update(task_id, is_done=is_done))
+            self.refresh_tasks()
+        except Exception as e:
+            self.status_label.configure(text=f"完了状態更新エラー: {e}", text_color="red")
+
     def show_detail_popup(self, task_id):
         # タスク詳細取得
         task = asyncio.run(task_manager.get_by_id(task_id))
@@ -225,7 +250,8 @@ class TodoPage(tk.CTkFrame):
         popup = tk.CTkToplevel(self)
         popup.title("タスク詳細")
         popup.geometry("350x250")
-        detail_text = f"ID: {task[0]}\n名前: {task[4]}\n説明: {task[2]}\nタグ: {task[3]}\n締切: {task[5]}\n優先度: {task[6]}"
+        tag_name = asyncio.run(tag_manager.get_by_id(task[6]))[2] if task[6] else "なし"
+        detail_text = f"ID: {task[0]}\n名前: {task[4]}\n説明: {task[5]}\nタグ: {tag_name}\n締切: {task[7]}\n優先度: {priority[task[8]]}"
         label = tk.CTkLabel(popup, text=detail_text, anchor="w", justify="left")
         label.pack(padx=20, pady=20)
         close_btn = tk.CTkButton(popup, text="閉じる", command=popup.destroy)
@@ -235,9 +261,9 @@ class TodoPage(tk.CTkFrame):
         try:
             asyncio.run(task_manager.delete(task_id))
             self.refresh_tasks()
-            self.status_label.configure(text="タスクを削除しました", fg_color="green")
+            self.status_label.configure(text="タスクを削除しました", text_color="green")
         except Exception as e:
-            self.status_label.configure(text=f"削除エラー: {e}", fg_color="red")
+            self.status_label.configure(text=f"削除エラー: {e}", text_color="red")
 
     def open_edit_popup(self, task_id, name):
         popup = tk.CTkToplevel(self)
@@ -351,10 +377,10 @@ class TodoPage(tk.CTkFrame):
                     is_done=new_is_done
                 ))
                 self.refresh_tasks()
-                self.status_label.configure(text="タスクを更新しました", fg_color="green")
+                self.status_label.configure(text="タスクを更新しました", text_color="green")
                 popup.destroy()
             except Exception as e:
-                self.status_label.configure(text=f"更新エラー: {e}", fg_color="red")
+                self.status_label.configure(text=f"更新エラー: {e}", text_color="red")
         save_btn = tk.CTkButton(btn_frame, text="保存", command=save)
         save_btn.pack(side="left", padx=10)
         cancel_btn = tk.CTkButton(btn_frame, text="キャンセル", command=popup.destroy)
