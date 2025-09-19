@@ -12,6 +12,58 @@ tag_manager: TagManager = TagManager()
 
 priority = ["無", "低", "中", "高", "最高"]
 
+class PlaceholderCTkEntry(tk.CTkEntry):
+    def __init__(self, master, placeholder, **kwargs):
+        super().__init__(master, **kwargs)
+        self.placeholder = placeholder
+        self.placeholder_color = "grey"
+        self.default_color = "black"
+        self._is_password = "show" in kwargs
+        self._is_placeholder_active = True  # プレースホルダー状態を明示的に管理
+
+        if self._is_password:
+            self.configure(show="")
+
+        self.insert(0, self.placeholder)
+        self.configure(text_color=self.placeholder_color)
+
+        self.bind("<FocusIn>", self._on_focus_in)
+        self.bind("<FocusOut>", self._on_focus_out)
+
+    def _on_focus_in(self, event):
+        if self._is_placeholder_active:
+            self.delete(0, tk.END)
+            self.configure(text_color="white")
+            self._is_placeholder_active = False
+            if self._is_password:
+                self.configure(show="*")
+
+    def _on_focus_out(self, event):
+        if not self.get():
+            self.insert(0, self.placeholder)
+            self.configure(text_color=self.placeholder_color)
+            self._is_placeholder_active = True
+            if self._is_password:
+                self.configure(show="", text_color=self.placeholder_color)
+
+    def clear_to_placeholder(self):
+        """値をクリアしてプレースホルダーに戻す"""
+        self.delete(0, tk.END)
+        self.insert(0, self.placeholder)
+        self.configure(text_color=self.placeholder_color)
+        self._is_placeholder_active = True
+        if self._is_password:
+            self.configure(show="")
+        # フォーカスを外す
+        if self.focus_get() == self:
+            self.master.focus_set()
+    
+    def get_real_value(self):
+        """プレースホルダーではない実際の値を取得"""
+        if self._is_placeholder_active:
+            return ""
+        return self.get()
+
 class TodoPage(tk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -20,6 +72,11 @@ class TodoPage(tk.CTkFrame):
         # UI
         logout_button = tk.CTkButton(self, text="ログアウト", command=self.logout)
         logout_button.pack(pady=10)
+
+        # タスク検索
+        self.search_entry = PlaceholderCTkEntry(self, placeholder="入力して検索...")
+        self.search_entry.pack(pady=5)
+        self.search_entry.bind("<KeyRelease>", lambda e: self.refresh_tasks())
 
         # タグフィルタ
         self.tag_filter_var = tk.StringVar(value="すべて")
