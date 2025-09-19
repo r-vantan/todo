@@ -92,6 +92,7 @@ class TodoPage(tk.CTkFrame):
         # タスク追加エリア
         self.new_task_entry = tk.CTkEntry(self)
         self.new_task_entry.pack(pady=10)
+        self.new_task_entry.bind("<Return>", lambda e: self.add_task())
 
         add_task_button = tk.CTkButton(self, text="タスク追加", command=self.add_task)
         add_task_button.pack(pady=10)
@@ -146,6 +147,11 @@ class TodoPage(tk.CTkFrame):
         if selected_tag != "すべて":
             selected_tag_id = self.tag_id_dict.get(selected_tag)
             tasks = [t for t in tasks if t[6] == selected_tag_id]
+        
+        # 検索フィルタ適用
+        search_text = self.search_entry.get_real_value()
+        if search_text:
+            tasks = asyncio.run(task_manager.search(get_current_user_id(), keyword=search_text))
 
         for task in tasks:
             # DB設計に合わせてインデックス修正
