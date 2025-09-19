@@ -1,0 +1,17 @@
+aiosqlite==0.21.0
+babel==2.17.0
+bcrypt==4.3.0
+blinker==1.9.0
+click==8.2.1
+customtkinter==5.2.2
+darkdetect==0.8.0
+Flask==2.3.3
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.2
+packaging==25.0
+pillow==11.3.0
+python-dotenv==1.0.0
+tkcalendar==1.6.1
+typing_extensions==4.15.0
+Werkzeug==3.1.3
