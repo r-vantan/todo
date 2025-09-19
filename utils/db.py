@@ -105,25 +105,6 @@ async def auth_user(email, password):
         return user
     return False
 
-async def create_tag(user_id, name, color=None):
-    """
-    新しいタグを作成する
-    
-    Args:
-        user_id (int): タグを作成するユーザーのID
-        name (str): タグ名
-        color (str, optional): タグの色。デフォルトはNone
-        
-    Returns:
-        None
-    """
-    async with aiosqlite.connect(DB_PATH) as conn:
-        await conn.execute(
-            "INSERT INTO tags (user, name, color) VALUES (?, ?, ?)",
-            (user_id, name, color)
-        )
-        await conn.commit()
-
 async def get_tags_by_user(user_id):
     """
     指定ユーザーのタグ一覧を取得する
