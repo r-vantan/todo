@@ -58,7 +58,7 @@ if __name__ == "__main__":
     app = App()
 
     def run_reminder_loop():
-        asyncio.run(reminder_loop(app))
+        asyncio.run(reminder_loop())
 
     threading.Thread(target=run_reminder_loop, daemon=True).start()
     app.mainloop()

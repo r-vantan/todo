@@ -4,7 +4,7 @@ from utils.db import (
     delete_reminder,
     get_reminders_by_user,
     update_reminder,
-    get_reminders_by_tasks,
+    get_reminders_by_task,
     done_reminder
 )
 from datetime import datetime, timedelta
@@ -19,8 +19,8 @@ taskmanager: TaskManager = TaskManager()
 
 class ReminderManager:
     @staticmethod
-    async def create_reminder(user_id: int, task_id: int, remind_at: str):
-        return await reminder_create(user_id, task_id, remind_at)
+    async def create_reminder(task_id: int, remind_at: str):
+        return await reminder_create(task_id, remind_at)
 
     @staticmethod
     async def fetch_upcoming_reminders():
@@ -28,7 +28,7 @@ class ReminderManager:
     
     @staticmethod
     async def fetch_reminder(reminder_id: int):
-        reminders = await get_reminders_by_tasks(reminder_id)
+        reminders = await get_reminders_by_task(reminder_id)
         if reminders:
             return reminders[0]
         return None
@@ -46,8 +46,8 @@ class ReminderManager:
         return await update_reminder(reminder_id, new_remind_at)
 
     @staticmethod
-    async def fetch_reminders_by_tasks(task_id: int):
-        return await get_reminders_by_tasks(task_id)
+    async def fetch_reminders_by_task(task_id: int):
+        return await get_reminders_by_task(task_id)
     
     @staticmethod
     async def done_reminder(reminder_id: int):
@@ -69,22 +69,23 @@ class ReminderManager:
         now = datetime.now()
         tasks_to_remind = []
         for reminder in reminders:
-            remind_at = datetime.fromisoformat(reminder['remind_at'])
+            # reminder: (id, task_id, remind_at, is_sent)
+            remind_at = datetime.fromisoformat(reminder[2])
             if now >= remind_at:
-                tasks_to_remind.append([reminder['task_id'], reminder['id']])
+                tasks_to_remind.append([reminder[1], reminder[0]])
         return tasks_to_remind
 
     @staticmethod
     async def update_reminder_for_task(task_id: int, old_deadline: datetime, new_deadline: datetime):
-        reminders = await get_reminders_by_tasks(task_id)
+        reminders = await get_reminders_by_task(task_id)
         for reminder in reminders:
-            remind_at = datetime.fromisoformat(reminder['remind_at'])
-            if reminder[3] == 1:  # If reminder is marked as done, skip it
+            remind_at = datetime.fromisoformat(reminder[2])
+            if reminder[3] == 1:  # is_sent
                 continue
             if old_deadline > remind_at:
                 time_diff = old_deadline - remind_at
                 new_remind_at = new_deadline - time_diff
-                await update_reminder(reminder['id'], new_remind_at.isoformat())
+                await update_reminder(reminder[0], new_remind_at.isoformat())
 
 async def send_notification(task_id: int, reminder_id: int):
     task = await taskmanager.get_by_id(task_id)
@@ -95,7 +96,7 @@ async def send_notification(task_id: int, reminder_id: int):
     notification.notify(
         title="リマインダー",
         message=f"{task_name}の締切まであと{int(time_diff.total_seconds() // 60)}分です。",
-        timeout=10  # 秒数（省略可）
+        timeout=10
     )
 
 def run_send_notification(task_id: int, reminder_id: int):

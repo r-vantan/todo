@@ -489,12 +489,11 @@ async def get_tag_by_id(tag_id):
         cursor = await conn.execute("SELECT * FROM tags WHERE id = ?", (tag_id,))
         return await cursor.fetchone()
     
-async def reminder_create(user_id, task_id, remind_at):
+async def reminder_create(task_id, remind_at):
     """
     新しいリマインダーを作成する
     
     Args:
-        user_id (int): リマインダーを作成するユーザーのID
         task_id (int): リマインダー対象のタスクID
         remind_at (datetime): リマインド日時
         
@@ -503,8 +502,8 @@ async def reminder_create(user_id, task_id, remind_at):
     """
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute(
-            "INSERT INTO reminders (user, task_id, remind_at) VALUES (?, ?, ?)",
-            (user_id, task_id, remind_at)
+            "INSERT INTO reminders (task_id, remind_at) VALUES (?, ?)",
+            (task_id, remind_at)
         )
         await conn.commit()
 
@@ -550,7 +549,12 @@ async def get_reminders_by_user(user_id):
         list: リマインダー情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute("SELECT * FROM reminders WHERE user = ?", (user_id,))
+        query = """
+        SELECT reminders.* FROM reminders
+        JOIN tasks ON reminders.task_id = tasks.id
+        WHERE tasks.user = ?
+        """
+        cursor = await conn.execute(query, (user_id,))
         return await cursor.fetchall()
     
 async def update_reminder(reminder_id, remind_at=None):
@@ -578,24 +582,23 @@ async def update_reminder(reminder_id, remind_at=None):
             await conn.execute(query, params)
             await conn.commit()
 
-async def get_reminders_by_tasks(task_ids):
+async def get_reminders_by_task(task_id):
     """
-    複数タスクに紐づくリマインダー一覧を取得する
+    タスクに紐づくリマインダー一覧を取得する
     
     Args:
-        task_ids (list): タスクIDのリスト
+        task_id (int): タスクID
         
     Returns:
         list: 指定タスクに紐づくリマインダー情報のタプルのリスト
     """
-    if not task_ids:
+    if not task_id:
         return []
-    
-    placeholders = ','.join('?' for _ in task_ids)
-    query = f"SELECT * FROM reminders WHERE task_id IN ({placeholders})"
-    
+
+    query = f"SELECT * FROM reminders WHERE task_id = ?"
+
     async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute(query, task_ids)
+        cursor = await conn.execute(query, (task_id,))
         return await cursor.fetchall()
 
 async def done_reminder(reminder_id):
