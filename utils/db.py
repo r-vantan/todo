@@ -488,3 +488,129 @@ async def get_tag_by_id(tag_id):
     async with aiosqlite.connect(DB_PATH) as conn:
         cursor = await conn.execute("SELECT * FROM tags WHERE id = ?", (tag_id,))
         return await cursor.fetchone()
+    
+async def reminder_create(user_id, task_id, remind_at):
+    """
+    新しいリマインダーを作成する
+    
+    Args:
+        user_id (int): リマインダーを作成するユーザーのID
+        task_id (int): リマインダー対象のタスクID
+        remind_at (datetime): リマインド日時
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "INSERT INTO reminders (user, task_id, remind_at) VALUES (?, ?, ?)",
+            (user_id, task_id, remind_at)
+        )
+        await conn.commit()
+
+async def get_upcoming_reminders(current_time):
+    """
+    指定日時以降のリマインダー一覧を取得する
+    
+    Args:
+        current_time (datetime): 現在日時
+        
+    Returns:
+        list: 指定日時以降のリマインダー情報のタプルのリスト
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT * FROM reminders WHERE remind_at >= ? ORDER BY remind_at ASC",
+            (current_time,)
+        )
+        return await cursor.fetchall()
+    
+async def delete_reminder(reminder_id):
+    """
+    リマインダーを削除する
+    
+    Args:
+        reminder_id (int): 削除するリマインダーのID
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+        await conn.commit()
+
+async def get_reminders_by_user(user_id):
+    """
+    指定ユーザーのリマインダー一覧を取得する
+    
+    Args:
+        user_id (int): リマインダーを取得するユーザーのID
+        
+    Returns:
+        list: リマインダー情報のタプルのリスト
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT * FROM reminders WHERE user = ?", (user_id,))
+        return await cursor.fetchall()
+    
+async def update_reminder(reminder_id, remind_at=None):
+    """
+    リマインダー情報を更新する
+    
+    Args:
+        reminder_id (int): 更新するリマインダーのID
+        remind_at (str): 新しいリマインド日時("YYYY-MM-DD HH:MM:SS"形式)
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        updates = []
+        params = []
+        
+        if remind_at is not None:
+            updates.append("remind_at = ?")
+            params.append(remind_at)
+        
+        if updates:
+            params.append(reminder_id)
+            query = f"UPDATE reminders SET {', '.join(updates)} WHERE id = ?"
+            await conn.execute(query, params)
+            await conn.commit()
+
+async def get_reminders_by_tasks(task_ids):
+    """
+    複数タスクに紐づくリマインダー一覧を取得する
+    
+    Args:
+        task_ids (list): タスクIDのリスト
+        
+    Returns:
+        list: 指定タスクに紐づくリマインダー情報のタプルのリスト
+    """
+    if not task_ids:
+        return []
+    
+    placeholders = ','.join('?' for _ in task_ids)
+    query = f"SELECT * FROM reminders WHERE task_id IN ({placeholders})"
+    
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(query, task_ids)
+        return await cursor.fetchall()
+
+async def done_reminder(reminder_id):
+    """
+    リマインダーを完了状態にする
+    
+    Args:
+        reminder_id (int): 完了にするリマインダーのID
+        
+    Returns:
+        None
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "UPDATE reminders SET is_sent = 1 WHERE id = ?",
+            (reminder_id,)
+        )
+        await conn.commit()

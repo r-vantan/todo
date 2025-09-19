@@ -7,6 +7,9 @@ from pages.login import LoginPage
 from pages.todo import TodoPage
 from pages.sign_up import SignUpPage
 from lib.session import is_logged_in
+import threading
+from lib.reminder import reminder_loop
+import asyncio
 
 
 class App(tk.CTk):
@@ -53,4 +56,9 @@ if __name__ == "__main__":
     tk.set_appearance_mode("Dark")
     tk.set_default_color_theme("blue")
     app = App()
+
+    def run_reminder_loop():
+        asyncio.run(reminder_loop(app))
+
+    threading.Thread(target=run_reminder_loop, daemon=True).start()
     app.mainloop()
