@@ -70,6 +70,8 @@ class ReminderManager:
         tasks_to_remind = []
         for reminder in reminders:
             # reminder: (id, task_id, remind_at, is_sent)
+            if reminder[3] == 1:  # is_sent
+                continue
             remind_at = datetime.fromisoformat(reminder[2])
             if now >= remind_at:
                 tasks_to_remind.append([reminder[1], reminder[0]])
