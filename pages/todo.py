@@ -72,61 +72,204 @@ class TodoPage(tk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self._last_user_id = None  # 最後にロードしたユーザーIDを保存
+        self._last_user_id = None
 
-        # UI
-        logout_button = tk.CTkButton(self, text="ログアウト", command=self.logout)
-        logout_button.pack(pady=10)
+        # メインレイアウト設定
+        self.grid_rowconfigure(1, weight=1)  # メインエリアを拡張可能に
+        self.grid_columnconfigure(1, weight=1)  # メインエリアを拡張可能に
 
-        # タスク検索
-        self.search_entry = PlaceholderCTkEntry(self, placeholder="入力して検索...")
-        self.search_entry.pack(pady=5)
-        self.search_entry.bind("<KeyRelease>", lambda e: self.refresh_tasks())
+        # === ヘッダーエリア ===
+        self.create_header()
 
-        # タスク並び替え
-        self.sort_var = tk.StringVar(value="作成日")
-        sort_options = ["作成日", "期限日", "優先度", "名前"]
-        sort_menu = tk.CTkOptionMenu(self, variable=self.sort_var, values=sort_options, command=lambda v: self.refresh_tasks())
-        sort_menu.pack(pady=5)
+        # === サイドバーエリア ===
+        self.create_sidebar()
 
-        # 昇順・降順切替
-        self.order_var = tk.StringVar(value="昇順")
-        order_options = ["昇順", "降順"]
-        order_menu = tk.CTkOptionMenu(self, variable=self.order_var, values=order_options, command=lambda v: self.refresh_tasks())
-        order_menu.pack(pady=5)
-
-        # タグフィルタ
-        self.tag_filter_var = tk.StringVar(value="すべて")
-        self.tag_id_dict = {}  # タグ名→IDの辞書
-        self.tag_list = ["すべて"]  # 初期値、後で動的に更新可
-        self.tag_filter_menu = tk.CTkOptionMenu(self, variable=self.tag_filter_var, values=self.tag_list, command=lambda v: self.refresh_tasks())
-        self.tag_filter_menu.pack(pady=5)
-
-        # タスク一覧表示エリア（タスクごとにFrameで表示）
-        self.task_list_frame = tk.CTkFrame(self)
-        self.task_list_frame.pack(pady=10, fill="x")
-
-        # タスク追加エリア
-        self.new_task_entry = tk.CTkEntry(self)
-        self.new_task_entry.pack(pady=10)
-        self.new_task_entry.bind("<Return>", lambda e: self.add_task())
-
-        add_task_button = tk.CTkButton(self, text="タスク追加", command=self.add_task)
-        add_task_button.pack(pady=10)
-
-        # 完了・エラー表示用ラベル（常に空間を空けておく）
-        self.status_label = tk.CTkLabel(self, text="", fg_color="transparent")
-        self.status_label.pack(pady=10)
-
-        refresh_button = tk.CTkButton(self, text="タスク更新", command=self.refresh_tasks)
-        refresh_button.pack(pady=10)
-
-        # タスク共有エリア（共有タスクもFrameで表示）
-        self.shared_task_list_frame = tk.CTkFrame(self)
-        self.shared_task_list_frame.pack(pady=10, fill="x")
+        # === メインエリア ===
+        self.create_main_area()
 
         self.refresh_tasks()
         self.check_user_update()
+
+    def create_header(self):
+        """ヘッダーエリア（ログアウト、検索など）"""
+        header_frame = tk.CTkFrame(self, height=60)
+        header_frame.grid(
+            row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5)
+        )
+        header_frame.grid_columnconfigure(1, weight=1)  # 検索欄を拡張可能に
+
+        # ログアウトボタン
+        logout_button = tk.CTkButton(
+            header_frame, text="ログアウト", width=100, command=self.logout
+        )
+        logout_button.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        # 検索エリア
+        search_frame = tk.CTkFrame(header_frame, fg_color="transparent")
+        search_frame.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        search_frame.grid_columnconfigure(0, weight=1)
+
+        search_image = tk.CTkImage(
+            Image.open("static/search.png"), size=(20, 20)
+        )
+        search_label = tk.CTkLabel(search_frame, image=search_image, text="", font=("", 16))
+        search_label.grid(row=0, column=0, sticky="w")
+
+        self.search_entry = PlaceholderCTkEntry(
+            search_frame, placeholder="タスクを検索..."
+        )
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(5, 0))
+        self.search_entry.bind("<KeyRelease>", lambda e: self.refresh_tasks())
+
+        # 更新ボタン
+        refresh_button_image = tk.CTkImage(
+            Image.open("static/refresh.png"), size=(20, 20)
+        )
+        refresh_button = tk.CTkButton(
+            header_frame, image=refresh_button_image, text="", command=self.refresh_tasks, width=10
+        )
+        refresh_button.grid(row=0, column=2, padx=10, pady=10, sticky="e")
+
+    def create_sidebar(self):
+        """サイドバーエリア（フィルタ、ソート、タスク追加）"""
+        sidebar_frame = tk.CTkFrame(self, width=250)
+        sidebar_frame.grid(row=1, column=0, sticky="nsew", padx=(10, 5), pady=5)
+        sidebar_frame.grid_propagate(False)  # 幅を固定
+
+        # === タスク追加エリア ===
+        add_section = tk.CTkFrame(sidebar_frame)
+        add_section.pack(fill="x", padx=10, pady=10)
+
+        add_label = tk.CTkLabel(
+            add_section, text="新しいタスク", font=("", 14, "bold")
+        )
+        add_label.pack(pady=(10, 5))
+
+        self.new_task_entry = tk.CTkEntry(
+            add_section, placeholder_text="タスク名を入力..."
+        )
+        self.new_task_entry.pack(fill="x", padx=10, pady=5)
+        self.new_task_entry.bind("<Return>", lambda e: self.add_task())
+
+        add_task_img = tk.CTkImage(
+            Image.open("static/plus.png"), size=(20, 20)
+        )
+
+        add_task_button = tk.CTkButton(
+            add_section, image=add_task_img, text="タスク追加", command=self.add_task
+        )
+        add_task_button.pack(fill="x", padx=10, pady=(5, 10))
+
+        # === フィルタエリア ===
+        filter_section = tk.CTkFrame(sidebar_frame)
+        filter_section.pack(fill="x", padx=10, pady=5)
+
+        filter_label = tk.CTkLabel(
+            filter_section, text="フィルタ", font=("", 14, "bold")
+        )
+        filter_label.pack(pady=(10, 5))
+
+        # タグフィルタ
+        tag_filter_label = tk.CTkLabel(filter_section, text="タグ:")
+        tag_filter_label.pack(anchor="w", padx=10)
+
+        self.tag_filter_var = tk.StringVar(value="すべて")
+        self.tag_id_dict = {}
+        self.tag_list = ["すべて"]
+        self.tag_filter_menu = tk.CTkOptionMenu(
+            filter_section,
+            variable=self.tag_filter_var,
+            values=self.tag_list,
+            command=lambda v: self.refresh_tasks(),
+        )
+        self.tag_filter_menu.pack(fill="x", padx=10, pady=(5, 10))
+
+        # === ソートエリア ===
+        sort_section = tk.CTkFrame(sidebar_frame)
+        sort_section.pack(fill="x", padx=10, pady=5)
+
+        sort_label = tk.CTkLabel(
+            sort_section, text="並び替え", font=("", 14, "bold")
+        )
+        sort_label.pack(pady=(10, 5))
+
+        # ソート条件
+        sort_by_label = tk.CTkLabel(sort_section, text="並び順:")
+        sort_by_label.pack(anchor="w", padx=10)
+
+        self.sort_var = tk.StringVar(value="作成日")
+        sort_options = ["作成日", "期限日", "優先度", "名前"]
+        sort_menu = tk.CTkOptionMenu(
+            sort_section,
+            variable=self.sort_var,
+            values=sort_options,
+            command=lambda v: self.refresh_tasks(),
+        )
+        sort_menu.pack(fill="x", padx=10, pady=5)
+
+        # 昇順・降順
+        order_label = tk.CTkLabel(sort_section, text="順序:")
+        order_label.pack(anchor="w", padx=10)
+
+        self.order_var = tk.StringVar(value="昇順")
+        order_options = ["昇順", "降順"]
+        order_menu = tk.CTkOptionMenu(
+            sort_section,
+            variable=self.order_var,
+            values=order_options,
+            command=lambda v: self.refresh_tasks(),
+        )
+        order_menu.pack(fill="x", padx=10, pady=(5, 10))
+
+        # === ステータス表示エリア ===
+        self.status_label = tk.CTkLabel(sidebar_frame, text="", fg_color="transparent")
+        self.status_label.pack(side="bottom", pady=10)
+
+    def create_main_area(self):
+        """メインエリア（タスク一覧）"""
+        main_frame = tk.CTkFrame(self)
+        main_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=5)
+        main_frame.grid_rowconfigure(1, weight=1)  # スクロールエリアを拡張可能に
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # タスク一覧タイトル
+        title_frame = tk.CTkFrame(main_frame, height=50, fg_color="transparent")
+        title_frame.grid(row=0, column=0, sticky="ew", pady=(10, 5))
+        title_frame.grid_columnconfigure(0, weight=1)
+
+        task_title = tk.CTkLabel(
+            title_frame, text="マイタスク", font=("", 18, "bold")
+        )
+        task_title.grid(row=0, column=0, sticky="w", padx=10)
+
+        # タスク一覧エリア（スクロール可能）
+        self.task_scroll_frame = tk.CTkScrollableFrame(main_frame)
+        self.task_scroll_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+
+        # マイタスクフレーム
+        self.task_list_frame = tk.CTkFrame(
+            self.task_scroll_frame, fg_color="transparent"
+        )
+        self.task_list_frame.pack(fill="both", expand=True)
+
+        # 共有タスクエリア
+        shared_title_frame = tk.CTkFrame(main_frame, height=40, fg_color="transparent")
+        shared_title_frame.grid(row=2, column=0, sticky="ew", pady=(10, 5))
+
+        shared_title = tk.CTkLabel(
+            shared_title_frame, text="共有されたタスク", font=("", 16, "bold")
+        )
+        shared_title.grid(row=0, column=0, sticky="w", padx=10)
+
+        self.shared_task_scroll_frame = tk.CTkScrollableFrame(main_frame, height=150)
+        self.shared_task_scroll_frame.grid(
+            row=3, column=0, sticky="ew", padx=10, pady=(5, 10)
+        )
+
+        self.shared_task_list_frame = tk.CTkFrame(
+            self.shared_task_scroll_frame, fg_color="transparent"
+        )
+        self.shared_task_list_frame.pack(fill="both", expand=True)
 
     def check_user_update(self):
         current_user_id = get_current_user_id()
@@ -230,13 +373,13 @@ class TodoPage(tk.CTkFrame):
             tag_label = tk.CTkLabel(row_frame, text=tag_name if tag_name else "", width=60)
             tag_label.pack(side="left", padx=5)
             del_btn = tk.CTkButton(row_frame, image=trash_img, text="", width=30,command=lambda tid=task_id: self.delete_task(tid))
-            del_btn.pack(side="left", padx=5)
+            del_btn.pack(side="right", padx=5)
             edit_btn = tk.CTkButton(row_frame, image=edit_img,text="", width=30, command=lambda tid=task_id, nm=name: self.open_edit_popup(tid, nm))
-            edit_btn.pack(side="left", padx=5)
+            edit_btn.pack(side="right", padx=5)
             reminder_btn = tk.CTkButton(row_frame, image=reminder_img, text="", width=30, command=lambda tid=task_id: self.open_reminder_popup(tid))
-            reminder_btn.pack(side="left", padx=5)
+            reminder_btn.pack(side="right", padx=5)
             share_btn = tk.CTkButton(row_frame, image=share_img, text="", width=30, command=lambda tid=task_id: self.open_share_popup(tid))
-            share_btn.pack(side="left", padx=5)
+            share_btn.pack(side="right", padx=5)
 
         # 共有タスクもFrameで表示
         for widget in self.shared_task_list_frame.winfo_children():
@@ -248,14 +391,14 @@ class TodoPage(tk.CTkFrame):
             row_frame = tk.CTkFrame(self.shared_task_list_frame)
             row_frame.pack(fill="x", pady=2)
             label = tk.CTkLabel(row_frame, text=f"{name} (共有)", width=200, anchor="w")
-            label.pack(side="left", padx=5)
+            label.pack(side="right", padx=5)
             label.bind("<Double-Button-1>", lambda e, tid=task_id: self.show_detail_popup(tid))
             del_btn = tk.CTkButton(row_frame, image=trash_img, text="", width=30, command=lambda tid=task_id: self.delete_task(tid))
-            del_btn.pack(side="left", padx=5)
+            del_btn.pack(side="right", padx=5)
             edit_btn = tk.CTkButton(row_frame, image=edit_img, text="", width=30, command=lambda tid=task_id, nm=name: self.open_edit_popup(tid, nm))
-            edit_btn.pack(side="left", padx=5)
+            edit_btn.pack(side="right", padx=5)
             reminder_btn = tk.CTkButton(row_frame, image=reminder_img, text="", width=30, command=lambda tid=task_id: self.open_reminder_popup(tid))
-            reminder_btn.pack(side="left", padx=5)
+            reminder_btn.pack(side="right", padx=5)
 
     def toggle_done(self, task_id, is_done):
         try:

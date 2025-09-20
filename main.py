@@ -16,7 +16,7 @@ class App(tk.CTk):
     def __init__(self):
         super().__init__()
         self.title("TODOアプリ")
-        self.geometry("800x600")
+        self.geometry("1000x600")
         self.minsize(600, 400)  # 最小サイズを設定
         self.maxsize(1600, 1200)  # 最大サイズを設定
 
