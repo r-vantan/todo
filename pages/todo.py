@@ -72,6 +72,7 @@ class TodoPage(tk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+        self._last_user_id = None  # 最後にロードしたユーザーIDを保存
 
         # UI
         logout_button = tk.CTkButton(self, text="ログアウト", command=self.logout)
@@ -125,6 +126,14 @@ class TodoPage(tk.CTkFrame):
         self.shared_task_list_frame.pack(pady=10, fill="x")
 
         self.refresh_tasks()
+        self.check_user_update()
+
+    def check_user_update(self):
+        current_user_id = get_current_user_id()
+        if current_user_id != self._last_user_id:
+            self._last_user_id = current_user_id
+            self.refresh_tasks()
+        self.after(100, lambda: self.check_user_update())  # 1秒ごとにチェック
 
     def add_task(self):
         name = self.new_task_entry.get()
@@ -563,30 +572,30 @@ class TodoPage(tk.CTkFrame):
             if not email:
                 error_label.configure(text="メールアドレスを入力してください", text_color="red")
                 return
-            
+
             try:
                 user = asyncio.run(user_manager.get_by_email(email))
                 if not user:
                     error_label.configure(text="ユーザーが見つかりません", text_color="red")
                     return
-                    
+
                 # 自分自身との共有をチェック
                 current_user_id = get_current_user_id()
                 if user[0] == current_user_id:
                     error_label.configure(text="自分自身とは共有できません", text_color="red")
                     return
-                
+
                 # 既に共有済みかチェック
                 shared_users = asyncio.run(task_manager.get_shared_users_by_task(task_id))
                 if any(shared_user[0] == user[0] for shared_user in shared_users):
                     error_label.configure(text="既にこのユーザーと共有済みです", text_color="red")
                     return
-                
+
                 asyncio.run(task_manager.share_with_users(task_id, user[0]))
                 email_entry.delete(0, tk.END)
                 error_label.configure(text="共有しました", text_color="green")
                 refresh_share_list()
-                
+
             except Exception as e:
                 print(f"共有エラー: {e}")
                 error_label.configure(text="共有に失敗しました", text_color="red")
@@ -597,7 +606,7 @@ class TodoPage(tk.CTkFrame):
         # シェア一覧表示エリア
         list_frame = tk.CTkFrame(popup)
         list_frame.pack(fill="both", expand=True, pady=10)
-        
+
         # エラーメッセージ表示用ラベル（関数定義の前に作成）
         error_label = tk.CTkLabel(popup, text="", text_color="red")
         error_label.pack()
@@ -605,7 +614,7 @@ class TodoPage(tk.CTkFrame):
         def refresh_share_list():
             # エラー/成功メッセージをクリア
             error_label.configure(text="")
-            
+
             for widget in list_frame.winfo_children():
                 widget.destroy()
             try:
@@ -644,7 +653,6 @@ class TodoPage(tk.CTkFrame):
             except Exception as e:
                 print(f"共有解除エラー: {e}")
                 error_label.configure(text="共有の解除に失敗しました", text_color="red")
-
 
         refresh_share_list()
 
