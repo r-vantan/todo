@@ -7,13 +7,16 @@ from pages.login import LoginPage
 from pages.todo import TodoPage
 from pages.sign_up import SignUpPage
 from lib.session import is_logged_in
+import threading
+from lib.reminder import reminder_loop
+import asyncio
 
 
 class App(tk.CTk):
     def __init__(self):
         super().__init__()
         self.title("TODOアプリ")
-        self.geometry("800x600")
+        self.geometry("1000x600")
         self.minsize(600, 400)  # 最小サイズを設定
         self.maxsize(1600, 1200)  # 最大サイズを設定
 
@@ -48,9 +51,13 @@ class App(tk.CTk):
         # 少し待ってから再度フォーカスをリセット（確実にするため）
         self.after(1, lambda: frame.focus_set())
 
-
 if __name__ == "__main__":
     tk.set_appearance_mode("Dark")
     tk.set_default_color_theme("blue")
     app = App()
+
+    def run_reminder_loop():
+        asyncio.run(reminder_loop())
+
+    threading.Thread(target=run_reminder_loop, daemon=True).start()
     app.mainloop()

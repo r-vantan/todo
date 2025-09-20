@@ -63,4 +63,12 @@
 | name     | TEXT    | NOT NULL, UNIQUE(user, name)   | タグ名    |
 | color    | TEXT    |                                | タグ色    |
 
+### reminders
+| カラム名    | 型         | 制約                | 説明               |
+|-------------|------------|---------------------|--------------------|
+| id          | INTEGER    | PRIMARY KEY         | リマインダーID     |
+| task_id     | INTEGER    | FOREIGN KEY         | tasks(id)          |
+| remind_at   | DATETIME   | NOT NULL            | リマインド日時     |
+| is_sent     | BOOLEAN    | DEFAULT 0           | 送信済みフラグ     |
+
 ---

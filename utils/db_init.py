@@ -52,6 +52,15 @@ async def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
         """)
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            remind_at DATETIME NOT NULL,
+            is_sent INTEGER DEFAULT 0,
+            FOREIGN KEY(task_id) REFERENCES tasks(id)
+        );
+        """)
         await db.commit()
 
 if __name__ == "__main__":
