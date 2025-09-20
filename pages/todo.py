@@ -184,6 +184,19 @@ class TodoPage(tk.CTkFrame):
         )
         self.tag_filter_menu.pack(fill="x", padx=10, pady=(5, 10))
 
+        # 完了済み/未完了フィルタ
+        self.show_completed_var = tk.StringVar(value="すべて")
+        self.status_filter_label = tk.CTkLabel(filter_section, text="状態:")
+        self.status_filter_label.pack(anchor="w", padx=10)
+        status_options = ["すべて", "未完了", "完了済み"]
+        self.status_filter_menu = tk.CTkOptionMenu(
+            filter_section,
+            variable=self.show_completed_var,
+            values=status_options,
+            command=lambda v: self.refresh_tasks(),
+        )
+        self.status_filter_menu.pack(fill="x", padx=10, pady=(5, 10))
+
         # === ソートエリア ===
         sort_section = tk.CTkFrame(sidebar_frame)
         sort_section.pack(fill="x", padx=10, pady=5)
@@ -320,6 +333,13 @@ class TodoPage(tk.CTkFrame):
         if selected_tag != "すべて":
             selected_tag_id = self.tag_id_dict.get(selected_tag)
             tasks = [t for t in tasks if t[6] == selected_tag_id]
+        
+        # 完了済み/未完了フィルタ適用
+        status_filter = self.show_completed_var.get()
+        if status_filter == "未完了":
+            tasks = [t for t in tasks if t[3] == 0]  # is_doneが0のもの
+        elif status_filter == "完了済み":
+            tasks = [t for t in tasks if t[3] == 1]  # is_doneが1のもの
 
         # 並び替え適用
         sort_key = self.sort_var.get()
