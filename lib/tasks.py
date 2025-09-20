@@ -12,7 +12,9 @@ from utils.db import (
     share_task,
     get_shared_tasks,
     get_shared_tasks_by_user,
-    unshare_task
+    unshare_task,
+    get_shared_task_by_id,
+    get_shared_users_by_task
 )
 
 class TaskManager:
@@ -24,7 +26,7 @@ class TaskManager:
         await create_task(user_id, name, description, tag, deadline, priority)
     
     @staticmethod
-    async def get_by_user(user_id):
+    async def get_by_user(user_id=None):
         """ユーザーのタスク一覧を取得する"""
         return await get_tasks_by_user(user_id)
     
@@ -54,24 +56,24 @@ class TaskManager:
         await mark_task_undone(task_id)
     
     @staticmethod
-    async def search(user_id, **filters):
+    async def search(user_id=None, **filters):
         """タスクを検索する"""
         return await search_tasks(user_id, **filters)
     
     @staticmethod
-    async def get_sorted(user_id, sort_by="created_at", order="ASC"):
+    async def get_sorted(user_id=None, sort_by="created_at", order="ASC"):
         """ソート済みタスク一覧を取得する"""
         return await get_tasks_sorted(user_id, sort_by, order)
     
     @staticmethod
-    async def get_by_deadline_range(user_id, start_date=None, end_date=None):
+    async def get_by_deadline_range(user_id=None, start_date=None, end_date=None):
         """締切日範囲でタスクを取得する"""
         return await get_tasks_by_deadline(user_id, start_date, end_date)
     
     @staticmethod
-    async def share_with_users(task_id, user_ids):
+    async def share_with_users(task_id, user_id):
         """タスクを他ユーザーと共有する"""
-        await share_task(task_id, user_ids)
+        await share_task(task_id, user_id)
     
     @staticmethod
     async def get_shared_with_me(user_id):
@@ -84,28 +86,38 @@ class TaskManager:
         return await get_shared_tasks_by_user(user_id)
     
     @staticmethod
+    async def get_shared_task_by_id(task_id, user_id):
+        """共有タスクをIDで取得する"""
+        return await get_shared_task_by_id(task_id, user_id)
+    
+    @staticmethod
+    async def get_shared_users_by_task(task_id):
+        """特定のタスクが共有されているユーザー一覧を取得する"""
+        return await get_shared_users_by_task(task_id)
+    
+    @staticmethod
     async def unshare(task_id, user_id=None):
         """タスクの共有を解除する"""
         await unshare_task(task_id, user_id)
 
 # 便利な関数も提供
-async def get_user_tasks(user_id, include_shared=False):
+async def get_user_tasks(user_id=None, include_shared=False):
     """ユーザーのタスクを取得（共有タスクも含めるかオプション）"""
     own_tasks = await TaskManager.get_by_user(user_id)
-    if include_shared:
+    if include_shared and user_id is not None:  # 共有タスクは特定ユーザーのみ取得可能
         shared_tasks = await TaskManager.get_shared_with_me(user_id)
         return own_tasks + shared_tasks
     return own_tasks
 
-async def get_pending_tasks(user_id):
+async def get_pending_tasks(user_id=None):
     """未完了タスクのみを取得"""
     return await TaskManager.search(user_id, is_done=False)
 
-async def get_completed_tasks(user_id):
+async def get_completed_tasks(user_id=None):
     """完了タスクのみを取得"""
     return await TaskManager.search(user_id, is_done=True)
 
-async def get_high_priority_tasks(user_id, priority_threshold=2):
+async def get_high_priority_tasks(user_id=None, priority_threshold=2):
     """高優先度タスクを取得"""
     tasks = await TaskManager.get_by_user(user_id)
     return [task for task in tasks if task[6] >= priority_threshold]  # priority is at index 6

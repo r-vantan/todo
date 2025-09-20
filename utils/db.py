@@ -75,6 +75,20 @@ async def get_user_by_email(email):
     async with aiosqlite.connect(DB_PATH) as conn:
         cursor = await conn.execute("SELECT * FROM users WHERE email = ?", (email,))
         return await cursor.fetchone()
+    
+async def get_user_by_id(user_id):
+    """
+    ユーザーIDでユーザー情報を取得する
+    
+    Args:
+        user_id (int): 検索するユーザーID
+        
+    Returns:
+        tuple or None: ユーザー情報のタプル（id, name, email, password）、見つからない場合はNone
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        return await cursor.fetchone()
 
 async def verify_password(stored_password, provided_password):
     """
@@ -105,18 +119,21 @@ async def auth_user(email, password):
         return user
     return False
 
-async def get_tags_by_user(user_id):
+async def get_tags_by_user(user_id=None):
     """
-    指定ユーザーのタグ一覧を取得する
+    タグ一覧を取得する
     
     Args:
-        user_id (int): タグを取得するユーザーのID
+        user_id (int, optional): タグを取得するユーザーのID。Noneの場合は全ユーザーのタグを取得
         
     Returns:
         list: タグ情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute("SELECT * FROM tags WHERE user = ?", (user_id,))
+        if user_id is None:
+            cursor = await conn.execute("SELECT * FROM tags")
+        else:
+            cursor = await conn.execute("SELECT * FROM tags WHERE user = ?", (user_id,))
         return await cursor.fetchall()
 
 async def create_task(user_id, name, description=None, tag=None, deadline=None, priority=0):
@@ -142,18 +159,21 @@ async def create_task(user_id, name, description=None, tag=None, deadline=None, 
         )
         await conn.commit()
 
-async def get_tasks_by_user(user_id):
+async def get_tasks_by_user(user_id=None):
     """
-    指定ユーザーが作成したタスク一覧を取得する
+    タスク一覧を取得する
     
     Args:
-        user_id (int): タスクを取得するユーザーのID
+        user_id (int, optional): 取得するユーザーのID。Noneの場合は全ユーザーのタスクを取得
         
     Returns:
         list: タスク情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        cursor = await conn.execute("SELECT * FROM tasks WHERE user = ?", (user_id,))
+        if user_id is None:
+            cursor = await conn.execute("SELECT * FROM tasks")
+        else:
+            cursor = await conn.execute("SELECT * FROM tasks WHERE user = ?", (user_id,))
         return await cursor.fetchall()
 
 async def mark_task_done(task_id):
@@ -173,23 +193,22 @@ async def mark_task_done(task_id):
         )
         await conn.commit()
 
-async def share_task(task_id, user_ids):
+async def share_task(task_id, user_id):
     """
-    タスクを複数ユーザーに共有する
+    タスクをユーザーに共有する
     
     Args:
         task_id (int): 共有するタスクのID
-        user_ids (list): 共有先ユーザーIDのリスト
+        user_id (int): 共有先ユーザーID
         
     Returns:
         None
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        for user_id in user_ids:
-            await conn.execute(
-                "INSERT INTO task_shares (task_id, user_id) VALUES (?, ?)",
-                (task_id, user_id)
-            )
+        await conn.execute(
+            "INSERT INTO task_shares (task_id, user_id) VALUES (?, ?)",
+            (task_id, user_id)
+        )
         await conn.commit()
 
 async def get_shared_tasks(user_id):
@@ -232,6 +251,26 @@ async def get_shared_tasks_by_user(user_id):
             (user_id,)
         )
         return await cursor.fetchall()
+
+async def get_shared_task_by_id(task_id, user_id):
+    """
+    タスクIDで特定の共有タスク情報を取得する
+    
+    Args:
+        task_id (int): 取得するタスクのID
+        user_id (int): 共有されたタスクを取得するユーザーのID
+        
+    Returns:
+        tuple or None: タスク情報のタプル、見つからない場合はNone
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            """SELECT tasks.* FROM tasks
+               JOIN task_shares ON tasks.id = task_shares.task_id
+               WHERE tasks.id = ? AND task_shares.user_id = ?""",
+            (task_id, user_id)
+        )
+        return await cursor.fetchone()
 
 async def delete_task(task_id):
     """
@@ -299,12 +338,12 @@ async def update_task(task_id, name=None, description=None, tag=None, deadline=N
             await conn.execute(query, params)
             await conn.commit()
 
-async def search_tasks(user_id, keyword=None, tag_id=None, is_done=None, priority=None):
+async def search_tasks(user_id=None, keyword=None, tag_id=None, is_done=None, priority=None):
     """
     タスクを検索する
     
     Args:
-        user_id (int): 検索するユーザーのID
+        user_id (int, optional): 検索するユーザーのID。Noneの場合は全ユーザーのタスクを検索
         keyword (str, optional): タスク名や詳細に含まれるキーワード
         tag_id (int, optional): 特定のタグID
         is_done (bool, optional): 完了状態（True: 完了済み, False: 未完了）
@@ -314,8 +353,12 @@ async def search_tasks(user_id, keyword=None, tag_id=None, is_done=None, priorit
         list: 検索条件に一致するタスク情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        query = "SELECT * FROM tasks WHERE user = ?"
-        params = [user_id]
+        if user_id is None:
+            query = "SELECT * FROM tasks WHERE 1=1"
+            params = []
+        else:
+            query = "SELECT * FROM tasks WHERE user = ?"
+            params = [user_id]
         
         if keyword:
             query += " AND (name LIKE ? OR description LIKE ?)"
@@ -333,12 +376,12 @@ async def search_tasks(user_id, keyword=None, tag_id=None, is_done=None, priorit
         cursor = await conn.execute(query, params)
         return await cursor.fetchall()
 
-async def get_tasks_sorted(user_id, sort_by="created_at", order="ASC"):
+async def get_tasks_sorted(user_id=None, sort_by="created_at", order="ASC"):
     """
     ソート済みのタスク一覧を取得する
     
     Args:
-        user_id (int): タスクを取得するユーザーのID
+        user_id (int, optional): タスクを取得するユーザーのID。Noneの場合は全ユーザーのタスクを取得
         sort_by (str): ソートするカラム名（created_at, deadline, priority, name）
         order (str): ソート順（ASC: 昇順, DESC: 降順）
         
@@ -353,8 +396,12 @@ async def get_tasks_sorted(user_id, sort_by="created_at", order="ASC"):
         if order.upper() not in ["ASC", "DESC"]:
             order = "ASC"
             
-        query = f"SELECT * FROM tasks WHERE user = ? ORDER BY {sort_by} {order}"
-        cursor = await conn.execute(query, (user_id,))
+        if user_id is None:
+            query = f"SELECT * FROM tasks ORDER BY {sort_by} {order}"
+            cursor = await conn.execute(query)
+        else:
+            query = f"SELECT * FROM tasks WHERE user = ? ORDER BY {sort_by} {order}"
+            cursor = await conn.execute(query, (user_id,))
         return await cursor.fetchall()
 
 async def mark_task_undone(task_id):
@@ -374,12 +421,12 @@ async def mark_task_undone(task_id):
         )
         await conn.commit()
 
-async def get_tasks_by_deadline(user_id, start_date=None, end_date=None):
+async def get_tasks_by_deadline(user_id=None, start_date=None, end_date=None):
     """
     締め切り日範囲でタスクを取得する（リマインダー機能用）
     
     Args:
-        user_id (int): タスクを取得するユーザーのID
+        user_id (int, optional): タスクを取得するユーザーのID。Noneの場合は全ユーザーのタスクを取得
         start_date (datetime, optional): 開始日時
         end_date (datetime, optional): 終了日時
         
@@ -387,8 +434,12 @@ async def get_tasks_by_deadline(user_id, start_date=None, end_date=None):
         list: 指定期間内の締め切りがあるタスク情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        query = "SELECT * FROM tasks WHERE user = ? AND deadline IS NOT NULL"
-        params = [user_id]
+        if user_id is None:
+            query = "SELECT * FROM tasks WHERE deadline IS NOT NULL"
+            params = []
+        else:
+            query = "SELECT * FROM tasks WHERE user = ? AND deadline IS NOT NULL"
+            params = [user_id]
         
         if start_date:
             query += " AND deadline >= ?"
@@ -414,6 +465,28 @@ async def get_task_by_id(task_id):
     async with aiosqlite.connect(DB_PATH) as conn:
         cursor = await conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         return await cursor.fetchone()
+
+async def get_shared_users_by_task(task_id):
+    """
+    特定のタスクが共有されているユーザー一覧を取得する
+    
+    Args:
+        task_id (int): 共有先ユーザーを取得するタスクのID
+        
+    Returns:
+        list: 共有先ユーザー情報のリスト（user_id, email, nameの順）
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            """
+            SELECT users.id, users.email, users.name
+            FROM users
+            JOIN task_shares ON users.id = task_shares.user_id
+            WHERE task_shares.task_id = ?
+            """,
+            (task_id,)
+        )
+        return await cursor.fetchall()
 
 async def unshare_task(task_id, user_id=None):
     """
@@ -538,23 +611,30 @@ async def delete_reminder(reminder_id):
         await conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
         await conn.commit()
 
-async def get_reminders_by_user(user_id):
+async def get_reminders_by_user(user_id=None):
     """
-    指定ユーザーのリマインダー一覧を取得する
+    リマインダー一覧を取得する
     
     Args:
-        user_id (int): リマインダーを取得するユーザーのID
+        user_id (int, optional): リマインダーを取得するユーザーのID。Noneの場合は全ユーザーのリマインダーを取得
         
     Returns:
         list: リマインダー情報のタプルのリスト
     """
     async with aiosqlite.connect(DB_PATH) as conn:
-        query = """
-        SELECT reminders.* FROM reminders
-        JOIN tasks ON reminders.task_id = tasks.id
-        WHERE tasks.user = ?
-        """
-        cursor = await conn.execute(query, (user_id,))
+        if user_id is None:
+            query = """
+            SELECT reminders.* FROM reminders
+            JOIN tasks ON reminders.task_id = tasks.id
+            """
+            cursor = await conn.execute(query)
+        else:
+            query = """
+            SELECT reminders.* FROM reminders
+            JOIN tasks ON reminders.task_id = tasks.id
+            WHERE tasks.user = ?
+            """
+            cursor = await conn.execute(query, (user_id,))
         return await cursor.fetchall()
     
 async def update_reminder(reminder_id, remind_at=None):

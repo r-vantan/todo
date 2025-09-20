@@ -2,6 +2,7 @@ import customtkinter as tk
 from lib.tasks import TaskManager
 from lib.tags import TagManager
 from lib.reminder import ReminderManager
+from lib.users import UserManager
 from lib.session import get_current_user_id
 from lib.session import logout as db_logout
 import asyncio
@@ -11,6 +12,7 @@ from PIL import Image
 task_manager: TaskManager = TaskManager()
 tag_manager: TagManager = TagManager()
 reminder_manager: ReminderManager = ReminderManager()
+user_manager: UserManager = UserManager()
 
 priority = ["無", "低", "中", "高", "最高"]
 
@@ -188,6 +190,9 @@ class TodoPage(tk.CTkFrame):
         reminder_img = tk.CTkImage(
             light_image=Image.open("static/bell.png"), size=(20, 20)
         )
+        share_img = tk.CTkImage(
+            light_image=Image.open("static/share.png"), size=(20, 20)
+        )
 
         for task in tasks:
             # DB設計に合わせてインデックス修正
@@ -221,13 +226,16 @@ class TodoPage(tk.CTkFrame):
             edit_btn.pack(side="left", padx=5)
             reminder_btn = tk.CTkButton(row_frame, image=reminder_img, text="", width=30, command=lambda tid=task_id: self.open_reminder_popup(tid))
             reminder_btn.pack(side="left", padx=5)
+            share_btn = tk.CTkButton(row_frame, image=share_img, text="", width=30, command=lambda tid=task_id: self.open_share_popup(tid))
+            share_btn.pack(side="left", padx=5)
 
         # 共有タスクもFrameで表示
         for widget in self.shared_task_list_frame.winfo_children():
             widget.destroy()
         shared_tasks = self.get_shared_tasks()
         for task in shared_tasks:
-            task_id, name = task[0], task[1]
+            # タスク構造: (id, user, created_at, is_done, name, description, tag, deadline, priority)
+            task_id, name = task[0], task[4]  # nameは5番目のフィールド（インデックス4）
             row_frame = tk.CTkFrame(self.shared_task_list_frame)
             row_frame.pack(fill="x", pady=2)
             label = tk.CTkLabel(row_frame, text=f"{name} (共有)", width=200, anchor="w")
@@ -464,7 +472,7 @@ class TodoPage(tk.CTkFrame):
         popup = tk.CTkToplevel(self)
         popup.title("リマインダー管理")
         popup.geometry("400x400")
-    
+
         # 新規リマインダー追加エリア
         entry_frame = tk.CTkFrame(popup)
         entry_frame.pack(pady=10)
@@ -510,7 +518,7 @@ class TodoPage(tk.CTkFrame):
                 refresh_reminder_list()
         add_btn = tk.CTkButton(entry_frame, text="+", width=30, command=add_reminder)
         add_btn.pack(side="left", padx=5)
-    
+
         # リマインダー一覧表示エリア
         list_frame = tk.CTkFrame(popup)
         list_frame.pack(fill="both", expand=True, pady=10)
@@ -530,13 +538,115 @@ class TodoPage(tk.CTkFrame):
                 label.pack(side="left", padx=5)
                 del_btn = tk.CTkButton(row, text="削除", width=40, command=lambda rid=reminder[0]: delete_reminder(rid))
                 del_btn.pack(side="right", padx=5)
-    
+
         def delete_reminder(reminder_id):
             # DBからリマインダー削除
             asyncio.run(reminder_manager.remove_reminder(reminder_id))
             refresh_reminder_list()
-    
+
         refresh_reminder_list()
+
+    def open_share_popup(self, task_id):
+        # ユーザーのメールアドレスを入力して共有
+        popup = tk.CTkToplevel(self)
+        popup.title("タスク共有")
+        popup.geometry("400x400")
+
+        # 新規シェア追加エリア
+        entry_frame = tk.CTkFrame(popup)
+        entry_frame.pack(pady=10)
+        email_entry = tk.CTkEntry(entry_frame, placeholder_text="メールアドレス")
+        email_entry.pack(side="left", padx=5)
+
+        def add_share():
+            email = email_entry.get()
+            if not email:
+                error_label.configure(text="メールアドレスを入力してください", text_color="red")
+                return
+            
+            try:
+                user = asyncio.run(user_manager.get_by_email(email))
+                if not user:
+                    error_label.configure(text="ユーザーが見つかりません", text_color="red")
+                    return
+                    
+                # 自分自身との共有をチェック
+                current_user_id = get_current_user_id()
+                if user[0] == current_user_id:
+                    error_label.configure(text="自分自身とは共有できません", text_color="red")
+                    return
+                
+                # 既に共有済みかチェック
+                shared_users = asyncio.run(task_manager.get_shared_users_by_task(task_id))
+                if any(shared_user[0] == user[0] for shared_user in shared_users):
+                    error_label.configure(text="既にこのユーザーと共有済みです", text_color="red")
+                    return
+                
+                asyncio.run(task_manager.share_with_users(task_id, user[0]))
+                email_entry.delete(0, tk.END)
+                error_label.configure(text="共有しました", text_color="green")
+                refresh_share_list()
+                
+            except Exception as e:
+                print(f"共有エラー: {e}")
+                error_label.configure(text="共有に失敗しました", text_color="red")
+
+        add_btn = tk.CTkButton(entry_frame, text="+", width=30, command=add_share)
+        add_btn.pack(side="left", padx=5)
+
+        # シェア一覧表示エリア
+        list_frame = tk.CTkFrame(popup)
+        list_frame.pack(fill="both", expand=True, pady=10)
+        
+        # エラーメッセージ表示用ラベル（関数定義の前に作成）
+        error_label = tk.CTkLabel(popup, text="", text_color="red")
+        error_label.pack()
+
+        def refresh_share_list():
+            # エラー/成功メッセージをクリア
+            error_label.configure(text="")
+            
+            for widget in list_frame.winfo_children():
+                widget.destroy()
+            try:
+                # 指定されたタスクが共有されているユーザー一覧を取得
+                shared_users = asyncio.run(task_manager.get_shared_users_by_task(task_id))
+                if shared_users:
+                    for user in shared_users:
+                        row = tk.CTkFrame(list_frame)
+                        row.pack(fill="x", pady=2)
+                        # user = (user_id, email, name)
+                        label = tk.CTkLabel(row, text=user[1], anchor="w")  # nameを表示
+                        label.pack(side="left", padx=5)
+                        del_btn = tk.CTkButton(
+                            row,
+                            text="削除",
+                            width=40,
+                            command=lambda uid=user[0]: remove_share(task_id, uid),
+                        )
+                        del_btn.pack(side="right", padx=5)
+                else:
+                    # 共有ユーザーがいない場合
+                    no_share_label = tk.CTkLabel(list_frame, text="まだ誰とも共有していません")
+                    no_share_label.pack(pady=10)
+            except Exception as e:
+                print(f"共有リスト取得エラー: {e}")
+                # list_frame内に一時的なエラーラベルを作成
+                temp_error_label = tk.CTkLabel(list_frame, text="共有リストの取得に失敗しました", text_color="red")
+                temp_error_label.pack(pady=10)
+
+        def remove_share(task_id, user_id):
+            try:
+                # DBから共有を削除
+                asyncio.run(task_manager.unshare(task_id, user_id))
+                error_label.configure(text="共有を解除しました", text_color="green")
+                refresh_share_list()
+            except Exception as e:
+                print(f"共有解除エラー: {e}")
+                error_label.configure(text="共有の解除に失敗しました", text_color="red")
+
+
+        refresh_share_list()
 
     def get_tag_list(self):
         # DBからタグ一覧取得

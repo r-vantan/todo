@@ -38,7 +38,7 @@ class ReminderManager:
         return await delete_reminder(reminder_id)
 
     @staticmethod
-    async def fetch_reminders_by_user(user_id: int):
+    async def fetch_reminders_by_user(user_id=None):
         return await get_reminders_by_user(user_id)
 
     @staticmethod
@@ -54,12 +54,12 @@ class ReminderManager:
         return await done_reminder(reminder_id)
     
     @staticmethod
-    async def should_send_reminder(user_id: int):
+    async def should_send_reminder(user_id=None):
         """
         リマインドするべきタスクをリストで返す
 
         Args:
-            user_id (int): ユーザーID
+            user_id (int, optional): ユーザーID。Noneの場合は全ユーザーのリマインダーをチェック
 
         Returns:
             list: [[task_id, reminder_id], ...]

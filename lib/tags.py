@@ -14,7 +14,7 @@ class TagManager:
         await create_tag(user_id, name)
     
     @staticmethod
-    async def get_by_user(user_id):
+    async def get_by_user(user_id=None):
         """ユーザーのタグ一覧を取得する"""
         return await get_tags_by_user(user_id)
     

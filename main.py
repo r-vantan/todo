@@ -51,7 +51,6 @@ class App(tk.CTk):
         # 少し待ってから再度フォーカスをリセット（確実にするため）
         self.after(1, lambda: frame.focus_set())
 
-
 if __name__ == "__main__":
     tk.set_appearance_mode("Dark")
     tk.set_default_color_theme("blue")
