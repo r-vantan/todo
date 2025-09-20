@@ -391,7 +391,7 @@ class TodoPage(tk.CTkFrame):
             row_frame = tk.CTkFrame(self.shared_task_list_frame)
             row_frame.pack(fill="x", pady=2)
             label = tk.CTkLabel(row_frame, text=f"{name} (共有)", width=200, anchor="w")
-            label.pack(side="right", padx=5)
+            label.pack(side="left", padx=5)
             label.bind("<Double-Button-1>", lambda e, tid=task_id: self.show_detail_popup(tid))
             del_btn = tk.CTkButton(row_frame, image=trash_img, text="", width=30, command=lambda tid=task_id: self.delete_task(tid))
             del_btn.pack(side="right", padx=5)
