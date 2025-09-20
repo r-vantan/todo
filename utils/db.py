@@ -636,7 +636,21 @@ async def get_reminders_by_user(user_id=None):
             """
             cursor = await conn.execute(query, (user_id,))
         return await cursor.fetchall()
+
+async def get_reminder_by_id(reminder_id):
+    """
+    リマインダーIDで特定のリマインダー情報を取得する
     
+    Args:
+        reminder_id (int): 取得するリマインダーのID
+        
+    Returns:
+        tuple or None: リマインダー情報のタプル、見つからない場合はNone
+    """
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,))
+        return await cursor.fetchone()
+
 async def update_reminder(reminder_id, remind_at=None):
     """
     リマインダー情報を更新する

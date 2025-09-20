@@ -5,7 +5,8 @@ from utils.db import (
     get_reminders_by_user,
     update_reminder,
     get_reminders_by_task,
-    done_reminder
+    done_reminder,
+    get_reminder_by_id
 )
 from datetime import datetime, timedelta
 import asyncio
@@ -28,10 +29,7 @@ class ReminderManager:
     
     @staticmethod
     async def fetch_reminder(reminder_id: int):
-        reminders = await get_reminders_by_task(reminder_id)
-        if reminders:
-            return reminders[0]
-        return None
+        return await get_reminder_by_id(reminder_id)
 
     @staticmethod
     async def remove_reminder(reminder_id: int):
@@ -94,7 +92,7 @@ async def send_notification(task_id: int, reminder_id: int):
     task_name = task[4]
     reminder = await ReminderManager.fetch_reminder(reminder_id)
     reminder_time = reminder[2]
-    time_diff: timedelta = datetime.fromisoformat(reminder_time) - datetime.fromisoformat(task[7])
+    time_diff: timedelta = datetime.fromisoformat(task[7]) - datetime.fromisoformat(reminder_time)
     notification.notify(
         title="リマインダー",
         message=f"{task_name}の締切まであと{int(time_diff.total_seconds() // 60)}分です。",
@@ -102,7 +100,11 @@ async def send_notification(task_id: int, reminder_id: int):
     )
 
 def run_send_notification(task_id: int, reminder_id: int):
-    asyncio.run(send_notification(task_id, reminder_id))
+    try:
+        asyncio.run(send_notification(task_id, reminder_id))
+        asyncio.run(ReminderManager.done_reminder(reminder_id))
+    except Exception as e:
+        print(f"Error sending notification: {e}")
 
 async def reminder_loop():
     while True:
@@ -116,5 +118,4 @@ async def reminder_loop():
         for reminder in should_send:
             threading.Thread(target=run_send_notification, args=(reminder[0], reminder[1])).start()
             print(f"Reminder for user {reminder[0]} about task {reminder[1]}")
-            await ReminderManager.done_reminder(reminder[1])
         await asyncio.sleep(60)  # 1分ごとにチェック
